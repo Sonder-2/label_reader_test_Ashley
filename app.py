@@ -55,8 +55,8 @@ if uploaded_file:
                     "parts": [
                         {"text": prompt_text},
                         {
-                            "inline_data": {
-                                "mime_type": "image/jpeg",
+                            "inlineData": {
+                                "mimeType": "image/jpeg",
                                 "data": img_base64
                             }
                         }
@@ -98,3 +98,6 @@ if uploaded_file:
                 st.error(f"✅ 成功回傳但解析失敗：{e}")
         else:
             st.error(f"❌ 請求失敗（狀態碼 {response.status_code}）：\n{response.text}")
+            st.subheader("🔍 Debug 回傳內容")
+            st.code(response.text, language="json")
+
