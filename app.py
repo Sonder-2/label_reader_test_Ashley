@@ -15,8 +15,6 @@ st.write("上傳商品標籤圖片，我們會幫你解讀成分內容，並提�
 # 使用者選項
 mode = st.radio("請選擇顯示模式：", ["簡易模式（僅總結）", "進階模式（完整解讀）"])
 speech_speed = st.radio("請選擇語音播放速度：", ["正常語速", "慢速播放"])
-if st.button("🔄 重新開始"):
-    st.experimental_rerun()
 
 # 上傳圖片（多圖支援）
 uploaded_files = st.file_uploader("請上傳商品標籤圖片（可多張，jpg/png，5MB 內）", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
@@ -132,3 +130,15 @@ if uploaded_files:
             st.subheader("🔍 API 回傳錯誤 JSON")
             st.json(err)
             st.stop()
+
+# ✅ 安全處理「重新開始」
+if "reset" not in st.session_state:
+    st.session_state.reset = False
+
+if st.button("🔄 重新開始"):
+    st.session_state.reset = True
+
+if st.session_state.reset:
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    st.experimental_rerun()
