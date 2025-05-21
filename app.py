@@ -50,20 +50,20 @@ if uploaded_file:
         url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"
         params = {"key": GEMINI_API_KEY}
         payload = {
-            "contents": [
+    "contents": [
+        {
+            "parts": [
+                {"text": prompt_text},
                 {
-                    "parts": [
-                        {"text": prompt_text},
-                        {
-                            "inlineData": {
-                                "mimeType": "image/jpeg",
-                                "data": img_base64
-                            }
-                        }
-                    ]
+                    "inline_data": {
+                        "mime_type": "image/jpeg",
+                        "data": img_base64
+                    }
                 }
             ]
         }
+    ]
+}
 
         with st.spinner("AI 正在解讀標籤中..."):
             response = requests.post(url, params=params, json=payload)
