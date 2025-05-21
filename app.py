@@ -37,17 +37,13 @@ if uploaded_files:
             st.error(f"❌ 圖片處理失敗：{e}")
             continue
 
-        import uuid  # 確保你在最上面有 import uuid
+        from io import BytesIO  # 放在 import 區加這一行
 
-        # 安全英文檔名處理
-        safe_filename = f"{uuid.uuid4().hex}.jpg"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg", prefix=safe_filename) as temp_file:
-            image.save(temp_file.name, format="JPEG")
-            image_path = temp_file.name
+# 將圖片轉為 base64（不儲存到硬碟）
+        buffered = BytesIO()
+        image.save(buffered, format="JPEG")
+        img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-
-        with open(image_path, "rb") as img_file:
-            img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
 
         prompt_text = """
 這是一張商品標籤的圖片，請協助我判讀以下資訊，並在最後加上一段「總結說明」，適合以語音形式朗讀：
