@@ -12,12 +12,31 @@ st.set_page_config(page_title="長者友善標籤小幫手", layout="centered")
 st.title("👵 長者友善標籤小幫手")
 st.write("上傳商品標籤圖片，我們會幫你解讀成分內容，並提供語音播放。")
 
+# ✅ 安全處理「重新開始」功能
+if "reset_flag" not in st.session_state:
+    st.session_state.reset_flag = False
+
+if st.button("🔄 重新開始"):
+    st.session_state.reset_flag = True
+    st.rerun()
+
+if st.session_state.reset_flag:
+    for key in list(st.session_state.keys()):
+        if key != "reset_flag":
+            del st.session_state[key]
+    st.session_state.reset_flag = False
+    st.rerun()
+
 # 使用者選項
 mode = st.radio("請選擇顯示模式：", ["簡易模式（僅總結）", "進階模式（完整解讀）"])
 speech_speed = st.radio("請選擇語音播放速度：", ["正常語速", "慢速播放"])
 
 # 上傳圖片（多圖支援）
-uploaded_files = st.file_uploader("請上傳商品標籤圖片（可多張，jpg/png，5MB 內）", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+uploaded_files = st.file_uploader(
+    "請上傳商品標籤圖片（可多張，jpg/png，5MB 內）",
+    type=["jpg", "jpeg", "png"],
+    accept_multiple_files=True
+)
 
 if uploaded_files:
     for uploaded_file in uploaded_files:
@@ -40,7 +59,7 @@ if uploaded_files:
             image_path = temp_file.name
 
         with open(image_path, "rb") as img_file:
-            img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
+            img_base64 = base64.b64encode(img_file.read()).decode("utf-8")
 
         prompt_text = """
 這是一張商品標籤的圖片，請協助我判讀以下資訊，並在最後加上一段「總結說明」，適合以語音形式朗讀：
@@ -54,7 +73,7 @@ if uploaded_files:
 4. **在最後加入一段「總結說明」**，用簡短白話總結這項產品的核心資訊（例如用途、成分關鍵點、誰應避免）
 
 只輸出清楚段落文字，無需任何多餘說明。
-        """
+"""
 
         url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"
         params = {"key": GEMINI_API_KEY}
@@ -130,21 +149,3 @@ if uploaded_files:
             st.subheader("🔍 API 回傳錯誤 JSON")
             st.json(err)
             st.stop()
-
-# ✅ 安全處理「重新開始」功能
-if "reset_flag" not in st.session_state:
-    st.session_state.reset_flag = False
-
-if st.button("🔄 重新開始"):
-    st.session_state.reset_flag = True
-    st.experimental_rerun()
-
-# 如果 reset_flag 被設為 True，清空所有 session_state，再下一輪初始化
-if st.session_state.reset_flag:
-    for key in list(st.session_state.keys()):
-        if key != "reset_flag":
-            del st.session_state[key]
-    st.session_state.reset_flag = False
-    st.experimental_rerun()
-
-
