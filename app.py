@@ -18,7 +18,7 @@ speech_speed = st.radio("請選擇語音播放速度：", ["正常語速", "慢�
 auto_play = st.checkbox("✅ 成分說明完成後，自動播放語音", value=True)
 
 # 上傳圖片
-uploaded_file = st.file_uploader("請上傳商品標籤圖片（jpg 或 png，5MB 以下）", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("請上傳商品標籤圖片（jpg 或 png，5MB 以下，檔名須為英文或數字）", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
     if uploaded_file.size > MAX_FILE_SIZE:
