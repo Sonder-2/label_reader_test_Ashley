@@ -97,7 +97,14 @@ if uploaded_file:
             except Exception as e:
                 st.error(f"✅ 成功回傳但解析失敗：{e}")
         else:
-            st.error(f"❌ 請求失敗（狀態碼 {response.status_code}）：\n{response.text}")
-            st.subheader("🔍 Debug 回傳內容")
-            st.code(response.text, language="json")
+            try:
+                err = response.json()
+            except Exception:
+                err = {"raw_text": response.text}
+
+            st.error(f"❌ 請求錯誤（{response.status_code}）")
+            st.subheader("🔍 API 回傳錯誤 JSON")
+            st.json(err)      # <-- 用 st.json 直接結構化顯示回傳的錯誤物件
+            st.stop()
+
 
