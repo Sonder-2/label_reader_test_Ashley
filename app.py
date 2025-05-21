@@ -1,10 +1,12 @@
 import streamlit as st
 import requests
 import base64
+import uuid
 from gtts import gTTS
 from PIL import Image
 import tempfile
 
+# 參數設定
 MAX_FILE_SIZE = 5 * 1024 * 1024
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
@@ -12,38 +14,36 @@ st.set_page_config(page_title="長者友善標籤小幫手", layout="centered")
 st.title("👵 長者友善標籤小幫手")
 st.write("上傳商品標籤圖片，我們會幫你解讀成分內容，並提供語音播放。")
 
-# 使用者選項
-mode = st.radio("請選擇顯示模式：", ["簡易模式（僅總結）", "進階模式（完整解讀）"])
+# 語音選項（不自動播放）
 speech_speed = st.radio("請選擇語音播放速度：", ["正常語速", "慢速播放"])
-if st.button("🔄 重新開始"):
-    st.experimental_rerun()
 
-# 上傳圖片（多圖支援）
-uploaded_files = st.file_uploader("請上傳商品標籤圖片（可多張，jpg/png，5MB 內）", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+# 上傳圖片
+uploaded_file = st.file_uploader("請上傳商品標籤圖片（jpg 或 png，5MB 以下）", type=["jpg", "jpeg", "png"])
 
-if uploaded_files:
-    for uploaded_file in uploaded_files:
-        st.markdown("---")
-        st.image(uploaded_file, caption="你上傳的圖片預覽", use_container_width=True)
-
-        if uploaded_file.size > MAX_FILE_SIZE:
-            st.error("❗ 檔案太大了，請上傳 5MB 以下的圖片。")
-            continue
-
+if uploaded_file:
+    if uploaded_file.size > MAX_FILE_SIZE:
+        st.error("❗ 檔案太大了，請上傳 5MB 以下的圖片。")
+    else:
         try:
             image = Image.open(uploaded_file).convert("RGB")
             image.thumbnail((1024, 1024))
         except Exception as e:
             st.error(f"❌ 圖片處理失敗：{e}")
-            continue
+            st.stop()
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_file:
+        # 顯示圖片預覽
+        st.image(image, caption="你上傳的圖片預覽", use_container_width=True)
+
+        # 用 uuid 生成安全檔名
+        safe_filename = f"{uuid.uuid4().hex}.jpg"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg", prefix=safe_filename) as temp_file:
             image.save(temp_file.name, format="JPEG")
             image_path = temp_file.name
 
         with open(image_path, "rb") as img_file:
             img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
 
+        # Gemini 提示詞
         prompt_text = """
 這是一張商品標籤的圖片，請協助我判讀以下資訊，並在最後加上一段「總結說明」，適合以語音形式朗讀：
 
@@ -58,6 +58,7 @@ if uploaded_files:
 只輸出清楚段落文字，無需任何多餘說明。
         """
 
+        # 呼叫 Gemini API
         url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"
         params = {"key": GEMINI_API_KEY}
         payload = {
@@ -79,11 +80,17 @@ if uploaded_files:
         with st.spinner("AI 正在解讀標籤中..."):
             response = requests.post(url, params=params, json=payload)
 
+        # 處理回傳結果
         if response.status_code == 200:
             try:
                 text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+                st.subheader("📝 成分說明")
+                st.markdown(
+                    f"<div style='font-size:20px; line-height:1.8;'>{text}</div>",
+                    unsafe_allow_html=True
+                )
 
-                # 分析總結段落
+                # 抓取總結語句
                 summary = ""
                 for line in text.splitlines():
                     if "總結說明" in line:
@@ -96,29 +103,15 @@ if uploaded_files:
                 if not summary:
                     summary = "這是一項含有多種成分的產品，請依照個人狀況酌量使用。"
 
-                # 顯示內容（根據模式切換）
-                st.subheader("📝 成分說明")
-                if mode == "進階模式（完整解讀）":
-                    st.markdown(
-                        f"<div style='font-size:18px; line-height:1.8;'>{text}</div>",
-                        unsafe_allow_html=True
-                    )
-                else:
-                    st.markdown(
-                        f"<div style='font-size:20px; font-weight:bold;'>{summary}</div>",
-                        unsafe_allow_html=True
-                    )
-
-                # 語音播放（不自動）
+                # TTS 語音合成（不自動播放）
                 tts = gTTS(summary, lang='zh-TW', slow=(speech_speed == "慢速播放"))
                 temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
                 tts.save(temp_audio.name)
 
+                # 播放語音（無自動播放）
                 st.subheader("🔈 總結語音播放")
-                st.audio(open(temp_audio.name, 'rb').read(), format='audio/mp3')
-
-                # 顯示信心語
-                st.info("🤖 本解讀為 AI 推論結果，若有疑問請諮詢專業人員。")
+                audio_file = open(temp_audio.name, 'rb')
+                st.audio(audio_file.read(), format='audio/mp3')
 
             except Exception as e:
                 st.error(f"✅ 成功回傳但解析失敗：{e}")
@@ -132,3 +125,4 @@ if uploaded_files:
             st.subheader("🔍 API 回傳錯誤 JSON")
             st.json(err)
             st.stop()
+
