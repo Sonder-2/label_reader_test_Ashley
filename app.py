@@ -49,7 +49,7 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True,
     key=st.session_state.uploader_key
 )
-
+)
 if uploaded_files:
     for uploaded_file in uploaded_files:
         st.markdown("---")
