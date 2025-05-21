@@ -99,17 +99,12 @@ if uploaded_files:
                 text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
 
                 # 分析總結段落
-                summary = ""
-                for line in text.splitlines():
-                    if "總結說明" in line:
-                        summary = line.strip()
-                    elif summary and line.strip():
-                        summary += "\n" + line.strip()
-                    elif summary and not line.strip():
-                        break
+                # ✅ 用簡單邏輯自動擷取最後一段總結內容
+            paragraphs = text.strip().split("\n\n")
+            summary = paragraphs[-1].strip() if paragraphs else ""
+        if not summary or len(summary) < 10:
+        summary = "這是一項含有多種成分的產品，請依照個人狀況酌量使用。"
 
-                if not summary:
-                    summary = "這是一項含有多種成分的產品，請依照個人狀況酌量使用。"
 
                 # 顯示內容（根據模式切換）
                 st.subheader("📝 成分說明")
