@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import base64
-import mimetypes
 from gtts import gTTS
 from PIL import Image
 import tempfile
@@ -50,20 +49,20 @@ if uploaded_file:
         url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"
         params = {"key": GEMINI_API_KEY}
         payload = {
-    "contents": [
-        {
-            "parts": [
-                {"text": prompt_text},
+            "contents": [
                 {
-                    "inline_data": {
-                        "mime_type": "image/jpeg",
-                        "data": img_base64
-                    }
+                    "parts": [
+                        {"text": prompt_text},
+                        {
+                            "inlineData": {
+                                "mimeType": "image/jpeg",
+                                "data": img_base64
+                            }
+                        }
+                    ]
                 }
             ]
         }
-    ]
-}
 
         with st.spinner("AI 正在解讀標籤中..."):
             response = requests.post(url, params=params, json=payload)
@@ -74,6 +73,7 @@ if uploaded_file:
                 st.subheader("📝 成分說明")
                 st.write(text)
 
+                # 提取總結段落
                 summary = ""
                 for line in text.splitlines():
                     if "總結說明" in line:
@@ -86,6 +86,7 @@ if uploaded_file:
                 if not summary:
                     summary = "這是一項含有多種成分的產品，請依照個人狀況酌量使用。"
 
+                # 語音播放
                 tts = gTTS(summary, lang='zh-TW')
                 temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
                 tts.save(temp_audio.name)
@@ -104,7 +105,6 @@ if uploaded_file:
 
             st.error(f"❌ 請求錯誤（{response.status_code}）")
             st.subheader("🔍 API 回傳錯誤 JSON")
-            st.json(err)      # <-- 用 st.json 直接結構化顯示回傳的錯誤物件
-            st.stop()
-
-
+            st.json(err)
+            st.subheader("📄 原始錯誤文字")
+            st.code(response.text)
