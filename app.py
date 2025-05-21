@@ -32,7 +32,9 @@ if uploaded_file:
             st.stop()
 
         # 顯示圖片預覽
-        st.image(image, caption="你上傳的圖片預覽", use_column_width=True)
+        # 顯示圖片預覽
+        st.image(image, caption="你上傳的圖片預覽", use_container_width=True)
+
 
         # 圖片轉 base64
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_file:
