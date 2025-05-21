@@ -131,14 +131,20 @@ if uploaded_files:
             st.json(err)
             st.stop()
 
-# ✅ 安全處理「重新開始」
-if "reset" not in st.session_state:
-    st.session_state.reset = False
+# ✅ 安全處理「重新開始」功能
+if "reset_flag" not in st.session_state:
+    st.session_state.reset_flag = False
 
 if st.button("🔄 重新開始"):
-    st.session_state.reset = True
-
-if st.session_state.reset:
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
+    st.session_state.reset_flag = True
     st.experimental_rerun()
+
+# 如果 reset_flag 被設為 True，清空所有 session_state，再下一輪初始化
+if st.session_state.reset_flag:
+    for key in list(st.session_state.keys()):
+        if key != "reset_flag":
+            del st.session_state[key]
+    st.session_state.reset_flag = False
+    st.experimental_rerun()
+
+
