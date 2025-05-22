@@ -1,38 +1,59 @@
 import streamlit as st
 import requests
 import base64
-from gtts import gTTS
 from PIL import Image
 import tempfile
-
-# ✅ 強制放最前面
-st.set_page_config(page_title="長者友善標籤小幫手", layout="centered")
-
-# ✅ 頁面強制刷新處理（用 URL query 判斷）
-if "reset" in st.query_params:
-    st.markdown(
-        """<meta http-equiv="refresh" content="0; url='/'" />""",
-        unsafe_allow_html=True
-    )
-    st.stop()
-
-# 🔄 重新開始按鈕（觸發 URL query）
-if st.button("🔄 重新開始"):
-    st.query_params["reset"] = "true"
-    st.rerun()
+import json
+from google.cloud import texttospeech
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
+st.set_page_config(page_title="長者友善標籤小幫手", layout="centered")
+
+# ✅ 初始化 Session State
+if "reset_flag" not in st.session_state:
+    st.session_state.reset_flag = False
+
+if st.button("🔄 重新開始"):
+    st.session_state.clear()
+    st.rerun()
+
 st.title("👵 長者友善標籤小幫手")
 st.write("上傳商品標籤圖片，我們會幫你解讀成分內容，並提供語音播放。")
 
-# 使用者選項
 mode = st.radio("請選擇顯示模式：", ["簡易模式（僅總結）", "進階模式（完整解讀）"])
 speech_speed = st.radio("請選擇語音播放速度：", ["正常語速", "慢速播放"])
+speech_lang = st.radio("請選擇語音語言：", ["中文", "台語"])
 
-# 上傳圖片（多圖支援）
-uploaded_files = st.file_uploader("請上傳商品標籤圖片（可多張，jpg/png，5MB 內，檔名為英文或數字）", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+uploaded_files = st.file_uploader("請上傳商品標籤圖片（可多張，jpg/png，5MB 內）", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+
+
+def generate_voice(summary_text, language='中文', speed="正常語速"):
+    audio_speed = 1.0 if speed == "正常語速" else 0.75
+
+    if language == "台語":
+        language_code = "nan-TW"
+        voice_name = "cmn-TW-Wavenet-B"  # 模擬台語（目前支援有限）
+    else:
+        language_code = "zh-TW"
+        voice_name = "cmn-TW-Wavenet-A"
+
+    client = texttospeech.TextToSpeechClient.from_service_account_info(
+        json.loads(st.secrets["GOOGLE_TTS_CREDENTIALS"])
+    )
+
+    synthesis_input = texttospeech.SynthesisInput(text=summary_text)
+    voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=voice_name)
+    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3, speaking_rate=audio_speed)
+
+    response = client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
+
+    temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+    with open(temp_audio.name, "wb") as out:
+        out.write(response.audio_content)
+    return temp_audio.name
+
 
 if uploaded_files:
     for uploaded_file in uploaded_files:
@@ -95,23 +116,25 @@ if uploaded_files:
         if response.status_code == 200:
             try:
                 text = response.json()["candidates"][0]["content"]["parts"][0].get("text", "").strip()
-
                 if not text:
                     st.warning("⚠️ 此圖片未產出有效文字，可能為圖像不清晰或無內容。")
                     continue
 
-                # 擷取總結段落
+                # 擷取總結段
                 summary = ""
-                lines = text.splitlines()
-                for i, line in enumerate(lines):
+                is_summary = False
+                for line in text.splitlines():
                     if "總結說明" in line:
-                        summary = "\n".join([line.strip()] + [l.strip() for l in lines[i + 1:] if l.strip()])
-                        break
+                        is_summary = True
+                        summary = line.strip()
+                    elif is_summary:
+                        if line.strip() == "":
+                            break
+                        summary += "\n" + line.strip()
 
                 if not summary:
                     summary = "這是一項含有多種成分的產品，請依照個人狀況酌量使用。"
 
-                # 顯示內容（根據模式）
                 st.subheader("📝 成分說明")
                 if mode == "進階模式（完整解讀）":
                     st.markdown(
@@ -124,13 +147,10 @@ if uploaded_files:
                         unsafe_allow_html=True
                     )
 
-                # 語音
-                tts = gTTS(summary, lang='zh-TW', slow=(speech_speed == "慢速播放"))
-                temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-                tts.save(temp_audio.name)
-
+                # 生成語音
+                audio_path = generate_voice(summary, language=speech_lang, speed=speech_speed)
                 st.subheader("🔈 總結語音播放")
-                st.audio(open(temp_audio.name, 'rb').read(), format='audio/mp3')
+                st.audio(open(audio_path, 'rb').read(), format='audio/mp3')
 
                 st.info("🤖 本解讀為 AI 推論結果，若有疑問請諮詢專業人員。")
 
