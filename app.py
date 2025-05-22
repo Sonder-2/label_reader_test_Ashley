@@ -93,20 +93,32 @@ if uploaded_files:
                     st.warning("⚠️ 此圖片未產出有效文字，可能為圖像不清晰或無內容。")
                     continue
 
-                # 擷取總結段落
+                # ✅ 改良版 summary 擷取邏輯
                 summary = ""
-                is_summary = False
-                for line in text.splitlines():
-                    if "總結說明" in line:
-                        is_summary = True
-                        summary = line.strip()
-                    elif is_summary:
-                        if line.strip() == "":
-                            break
-                        summary += "\n" + line.strip()
+                lines = text.splitlines()
+                summary_start = -1
 
-                if not summary:
-                    summary = "這是一項含有多種成分的產品，請依照個人狀況酌量使用。"
+                for idx, line in enumerate(lines):
+                    if "總結說明" in line:
+                        summary_start = idx
+                        break
+
+                if summary_start >= 0:
+                    collected = []
+                    empty_count = 0
+                    for line in lines[summary_start:]:
+                        stripped = line.strip()
+                        if stripped == "":
+                            empty_count += 1
+                            if empty_count >= 2:
+                                break
+                        else:
+                            empty_count = 0
+                        collected.append(stripped)
+                    summary = "\n".join(collected).strip()
+                else:
+                    fallback = [line.strip() for line in lines if line.strip() != ""]
+                    summary = "\n".join(fallback[-2:]) if fallback else "這是一項含有多種成分的產品，請依照個人狀況酌量使用。"
 
                 # 顯示內容（根據模式）
                 st.subheader("📝 成分說明")
@@ -121,7 +133,7 @@ if uploaded_files:
                         unsafe_allow_html=True
                     )
 
-                # 生成語音（不自動播放）
+                # 語音生成
                 tts = gTTS(summary, lang='zh-TW', slow=(speech_speed == "慢速播放"))
                 temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
                 tts.save(temp_audio.name)
@@ -143,3 +155,4 @@ if uploaded_files:
             st.subheader("🔍 API 回傳錯誤 JSON")
             st.json(err)
             st.stop()
+
