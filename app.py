@@ -5,21 +5,23 @@ from gtts import gTTS
 from PIL import Image
 import tempfile
 
-# ✅ 完整重置功能：從 URL 參數觸發清空狀態與檔案
-if st.experimental_get_query_params().get("reset") == ["true"]:
-    st.experimental_set_query_params()
+# ✅ set_page_config 必須是第一個 Streamlit 指令
+st.set_page_config(page_title="長者友善標籤小幫手", layout="centered")
+
+# ✅ 清除所有 session 與 query 狀態
+if st.query_params.get("reset") == ["true"]:
     st.session_state.clear()
+    st.query_params.clear()
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
-st.set_page_config(page_title="長者友善標籤小幫手", layout="centered")
 st.title("👵 長者友善標籤小幫手")
 st.write("上傳商品標籤圖片，我們會幫你解讀成分內容，並提供語音播放。")
 
-# 🔄 重新開始按鈕（改用 URL 重載清空）
+# 🔄 重新開始按鈕（改用 query 參數重載清空）
 if st.button("🔄 重新開始"):
-    st.experimental_set_query_params(reset="true")
+    st.query_params["reset"] = "true"
     st.rerun()
 
 # 使用者選項
