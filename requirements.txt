@@ -1,4 +1,5 @@
 streamlit
 requests
-Pillow
 gtts
+Pillow
+i18n-tts
