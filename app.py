@@ -5,6 +5,11 @@ from gtts import gTTS
 from PIL import Image
 import tempfile
 
+# ✅ 完整重置功能：從 URL 參數觸發清空狀態與檔案
+if st.experimental_get_query_params().get("reset") == ["true"]:
+    st.experimental_set_query_params()
+    st.session_state.clear()
+
 MAX_FILE_SIZE = 5 * 1024 * 1024
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
@@ -12,12 +17,9 @@ st.set_page_config(page_title="長者友善標籤小幫手", layout="centered")
 st.title("👵 長者友善標籤小幫手")
 st.write("上傳商品標籤圖片，我們會幫你解讀成分內容，並提供語音播放。")
 
-# ✅ 初始化與重新開始功能
-if "reset_flag" not in st.session_state:
-    st.session_state.reset_flag = False
-
+# 🔄 重新開始按鈕（改用 URL 重載清空）
 if st.button("🔄 重新開始"):
-    st.session_state.clear()
+    st.experimental_set_query_params(reset="true")
     st.rerun()
 
 # 使用者選項
@@ -93,32 +95,16 @@ if uploaded_files:
                     st.warning("⚠️ 此圖片未產出有效文字，可能為圖像不清晰或無內容。")
                     continue
 
-                # ✅ 改良版 summary 擷取邏輯
+                # ✅ 擷取總結段落，修正多圖失效問題
                 summary = ""
                 lines = text.splitlines()
-                summary_start = -1
-
-                for idx, line in enumerate(lines):
+                for i, line in enumerate(lines):
                     if "總結說明" in line:
-                        summary_start = idx
+                        summary = "\n".join([line.strip()] + [l.strip() for l in lines[i + 1:] if l.strip()])
                         break
 
-                if summary_start >= 0:
-                    collected = []
-                    empty_count = 0
-                    for line in lines[summary_start:]:
-                        stripped = line.strip()
-                        if stripped == "":
-                            empty_count += 1
-                            if empty_count >= 2:
-                                break
-                        else:
-                            empty_count = 0
-                        collected.append(stripped)
-                    summary = "\n".join(collected).strip()
-                else:
-                    fallback = [line.strip() for line in lines if line.strip() != ""]
-                    summary = "\n".join(fallback[-2:]) if fallback else "這是一項含有多種成分的產品，請依照個人狀況酌量使用。"
+                if not summary:
+                    summary = "這是一項含有多種成分的產品，請依照個人狀況酌量使用。"
 
                 # 顯示內容（根據模式）
                 st.subheader("📝 成分說明")
@@ -133,7 +119,7 @@ if uploaded_files:
                         unsafe_allow_html=True
                     )
 
-                # 語音生成
+                # 生成語音（不自動播放）
                 tts = gTTS(summary, lang='zh-TW', slow=(speech_speed == "慢速播放"))
                 temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
                 tts.save(temp_audio.name)
@@ -155,4 +141,3 @@ if uploaded_files:
             st.subheader("🔍 API 回傳錯誤 JSON")
             st.json(err)
             st.stop()
-
