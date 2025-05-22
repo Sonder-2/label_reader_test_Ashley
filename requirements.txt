@@ -2,3 +2,4 @@ streamlit
 requests
 gtts
 Pillow
+google-cloud-texttospeech
