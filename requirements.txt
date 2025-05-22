@@ -2,4 +2,3 @@ streamlit
 requests
 gtts
 Pillow
-git+https://github.com/jungomi/i18n-tts.git
