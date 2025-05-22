@@ -4,12 +4,9 @@ import base64
 from gtts import gTTS
 from PIL import Image
 import tempfile
-import uuid
-from i18n_tts import TTSServiceClient
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-i18n_client = TTSServiceClient()
 
 st.set_page_config(page_title="長者友善標籤小幫手", layout="centered")
 st.title("👵 長者友善標籤小幫手")
@@ -26,7 +23,6 @@ if st.button("🔄 重新開始"):
 # 使用者選項
 mode = st.radio("請選擇顯示模式：", ["簡易模式（僅總結）", "進階模式（完整解讀）"])
 speech_speed = st.radio("請選擇語音播放速度：", ["正常語速", "慢速播放"])
-speech_lang = st.radio("請選擇語音語言：", ["中文（華語）", "台語（臺灣閩南語）"])
 
 # 上傳圖片（多圖支援）
 uploaded_files = st.file_uploader("請上傳商品標籤圖片（可多張，jpg/png，5MB 內）", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
@@ -125,17 +121,10 @@ if uploaded_files:
                         unsafe_allow_html=True
                     )
 
-                # 生成語音（台語或中文）
+                # 生成語音（不自動播放）
+                tts = gTTS(summary, lang='zh-TW', slow=(speech_speed == "慢速播放"))
                 temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-
-                if speech_lang == "台語（臺灣閩南語）":
-                    tai_summary = summary.replace("\n", " ")  # 建議去除換行避免斷句錯誤
-                    audio_bytes = i18n_client.synthesize(tai_summary, target_lang="nan-TW", speaker="male")
-                    with open(temp_audio.name, "wb") as f:
-                        f.write(audio_bytes)
-                else:
-                    tts = gTTS(summary, lang='zh-TW', slow=(speech_speed == "慢速播放"))
-                    tts.save(temp_audio.name)
+                tts.save(temp_audio.name)
 
                 st.subheader("🔈 總結語音播放")
                 st.audio(open(temp_audio.name, 'rb').read(), format='audio/mp3')
