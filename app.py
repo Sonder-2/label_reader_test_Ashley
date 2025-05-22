@@ -6,7 +6,7 @@ import tempfile
 st.set_page_config(page_title="語音測試", layout="centered")
 st.title("🔈 Google TTS 測試")
 
-GOOGLE_TTS_CREDENTIALS = json.loads(st.secrets["GOOGLE_TTS_CREDENTIALS"])
+GOOGLE_TTS_CREDENTIALS = st.secrets["GOOGLE_TTS_CREDENTIALS"]
 
 if st.button("生成語音"):
     client = texttospeech.TextToSpeechClient.from_service_account_info(GOOGLE_TTS_CREDENTIALS)
