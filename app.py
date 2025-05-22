@@ -5,26 +5,31 @@ from gtts import gTTS
 from PIL import Image
 import tempfile
 import uuid
+from i18n_tts import TTSServiceClient
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+i18n_client = TTSServiceClient()
 
 st.set_page_config(page_title="長者友善標籤小幫手", layout="centered")
 st.title("👵 長者友善標籤小幫手")
 st.write("上傳商品標籤圖片，我們會幫你解讀成分內容，並提供語音播放。")
 
+# ✅ 初始化與重新開始功能
+if "reset_flag" not in st.session_state:
+    st.session_state.reset_flag = False
+
+if st.button("🔄 重新開始"):
+    st.session_state.clear()
+    st.rerun()
+
 # 使用者選項
 mode = st.radio("請選擇顯示模式：", ["簡易模式（僅總結）", "進階模式（完整解讀）"])
 speech_speed = st.radio("請選擇語音播放速度：", ["正常語速", "慢速播放"])
-if st.button("🔄 重新開始"):
-    st.rerun()
+speech_lang = st.radio("請選擇語音語言：", ["中文（華語）", "台語（臺灣閩南語）"])
 
 # 上傳圖片（多圖支援）
-uploaded_files = st.file_uploader(
-    "請上傳商品標籤圖片（可多張，jpg/png，5MB 內）", 
-    type=["jpg", "jpeg", "png"], 
-    accept_multiple_files=True
-)
+uploaded_files = st.file_uploader("請上傳商品標籤圖片（可多張，jpg/png，5MB 內）", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
 if uploaded_files:
     for uploaded_file in uploaded_files:
@@ -38,19 +43,16 @@ if uploaded_files:
         try:
             image = Image.open(uploaded_file).convert("RGB")
             image.thumbnail((1024, 1024))
-
-            # ✅ 使用 UUID 命名安全檔名
-            safe_filename = f"{uuid.uuid4().hex}.jpg"
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg", prefix=safe_filename) as temp_file:
-                image.save(temp_file.name, format="JPEG")
-                image_path = temp_file.name
-
-            with open(image_path, "rb") as img_file:
-                img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
-
         except Exception as e:
             st.error(f"❌ 圖片處理失敗：{e}")
             continue
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_file:
+            image.save(temp_file.name, format="JPEG")
+            image_path = temp_file.name
+
+        with open(image_path, "rb") as img_file:
+            img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
 
         prompt_text = """
 這是一張商品標籤的圖片，請協助我判讀以下資訊，並在最後加上一段「總結說明」，適合以語音形式朗讀：
@@ -89,22 +91,28 @@ if uploaded_files:
 
         if response.status_code == 200:
             try:
-                text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+                text = response.json()["candidates"][0]["content"]["parts"][0].get("text", "").strip()
 
-                # 分析總結段落
+                if not text:
+                    st.warning("⚠️ 此圖片未產出有效文字，可能為圖像不清晰或無內容。")
+                    continue
+
+                # 擷取總結段落
                 summary = ""
+                is_summary = False
                 for line in text.splitlines():
                     if "總結說明" in line:
+                        is_summary = True
                         summary = line.strip()
-                    elif summary and line.strip():
+                    elif is_summary:
+                        if line.strip() == "":
+                            break
                         summary += "\n" + line.strip()
-                    elif summary and not line.strip():
-                        break
 
                 if not summary:
                     summary = "這是一項含有多種成分的產品，請依照個人狀況酌量使用。"
 
-                # 顯示內容（根據模式切換）
+                # 顯示內容（根據模式）
                 st.subheader("📝 成分說明")
                 if mode == "進階模式（完整解讀）":
                     st.markdown(
@@ -117,10 +125,17 @@ if uploaded_files:
                         unsafe_allow_html=True
                     )
 
-                # 語音播放（不自動）
-                tts = gTTS(summary, lang='zh-TW', slow=(speech_speed == "慢速播放"))
+                # 生成語音（台語或中文）
                 temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-                tts.save(temp_audio.name)
+
+                if speech_lang == "台語（臺灣閩南語）":
+                    tai_summary = summary.replace("\n", " ")  # 建議去除換行避免斷句錯誤
+                    audio_bytes = i18n_client.synthesize(tai_summary, target_lang="nan-TW", speaker="male")
+                    with open(temp_audio.name, "wb") as f:
+                        f.write(audio_bytes)
+                else:
+                    tts = gTTS(summary, lang='zh-TW', slow=(speech_speed == "慢速播放"))
+                    tts.save(temp_audio.name)
 
                 st.subheader("🔈 總結語音播放")
                 st.audio(open(temp_audio.name, 'rb').read(), format='audio/mp3')
@@ -139,4 +154,3 @@ if uploaded_files:
             st.subheader("🔍 API 回傳錯誤 JSON")
             st.json(err)
             st.stop()
-
